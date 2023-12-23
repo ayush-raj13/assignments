@@ -39,11 +39,100 @@
 
   Testing the server - run `npm run test-todoServer` command in terminal
  */
-  const express = require('express');
-  const bodyParser = require('body-parser');
-  
-  const app = express();
-  
-  app.use(bodyParser.json());
-  
-  module.exports = app;
+const express = require('express');
+const bodyParser = require('body-parser');
+const fs = require('fs/promises');
+
+const app = express();
+app.use(bodyParser.json());
+
+const todoDataFile = './todos.json';
+let todoData = [];
+
+// Middleware to save todo data to file after each request
+const saveMiddleware = (req, res, next) => {
+  fs.writeFile(todoDataFile, JSON.stringify(todoData, null, 2), 'utf8')
+    .then()
+    .catch((err) => {
+      console.error(`Error writing todo data file: ${err.message}`);
+      res.status(500).send('Internal Server Error');
+    });
+}
+
+// Middleware to load todo data from file after each request
+app.use((req, res, next) => {
+  fs.readFile(todoDataFile, 'utf8')
+  .then((data) => {
+    todoData = JSON.parse(data);
+    next();
+  })
+  .catch((err) => {
+    console.error(`Error reading todo data file: ${err.message}`);
+  });
+});
+
+// Helper function to find todo by ID
+function findTodoById(id) {
+  return todoData.find((todo) => todo.id === id);
+}
+
+// Routes
+app.get('/todos', (req, res) => {
+  res.status(200).json(todoData);
+});
+
+app.get('/todos/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const todo = findTodoById(id);
+
+  if (todo) {
+    res.status(200).json(todo);
+  } else {
+    res.status(404).send('Not Found');
+  }
+});
+
+app.post('/todos', (req, res, next) => {
+  const { title, description } = req.body;
+  const id = todoData.length + 1;
+  const newTodo = { id, title, description };
+  todoData.push(newTodo);
+
+  res.status(201).json({ id });
+  next();
+}, saveMiddleware);
+
+app.put('/todos/:id', (req, res, next) => {
+  const id = parseInt(req.params.id, 10);
+  const todo = findTodoById(id);
+
+  if (todo) {
+    todo.title = req.body.title || todo.title;
+    todo.description = req.body.description || todo.description;
+
+    res.status(200).send('OK');
+    next();
+  } else {
+    res.status(404).send('Not Found');
+  }
+}, saveMiddleware);
+
+app.delete('/todos/:id', (req, res, next) => {
+  const id = parseInt(req.params.id, 10);
+  const index = todoData.findIndex((todo) => todo.id === id);
+
+  if (index !== -1) {
+    todoData.splice(index, 1);
+    res.status(200).send('OK');
+    next();
+  } else {
+    res.status(404).send('Not Found');
+  }
+}, saveMiddleware);
+
+// Handle undefined routes
+app.use((req, res) => {
+  res.status(404).send('Not Found');
+});
+
+module.exports = app;

@@ -12,10 +12,42 @@
     - For any other route not defined in the server return 404
     Testing the server - run `npm run test-fileServer` command in terminal
  */
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const app = express();
-
-
-module.exports = app;
+    const express = require('express');
+    const fs = require('fs');
+    const path = require('path');
+    const app = express();
+    
+    const filesDirectory = './files/';
+    
+    // Route to get a list of files present in the ./files/ directory
+    app.get('/files', (req, res) => {
+      fs.readdir(path.join(__dirname, filesDirectory), (err, files) => {
+        if (err) {
+          res.status(500).send('Internal Server Error');
+        } else {
+          res.status(200).json(files);
+        }
+      });
+    });
+    
+    // Route to get the content of a specific file by name
+    app.get('/file/:filename', (req, res) => {
+      const filename = req.params.filename;
+      const filePath = path.join(path.join(__dirname, filesDirectory), filename);
+    
+      fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+          res.status(404).send('File not found');
+        } else {
+          res.status(200).send(data);
+        }
+      });
+    });
+    
+    // Handle undefined routes
+    app.use((req, res) => {
+      res.status(404).send('Route not found');
+    });
+    
+    module.exports = app;
+    
