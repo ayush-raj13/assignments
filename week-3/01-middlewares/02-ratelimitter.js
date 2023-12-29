@@ -11,10 +11,31 @@ const app = express();
 // You have been given a numberOfRequestsForUser object to start off with which
 // clears every one second
 
-let numberOfRequestsForUser = {};
+const numberOfRequestsForUser = new Map();
 setInterval(() => {
-    numberOfRequestsForUser = {};
+    numberOfRequestsForUser.clear();
 }, 1000)
+
+function rateLimiter(numberOfRequestsPerSecond) {
+  return (req, res, next) => {
+    const userId = req.headers["user-id"];
+    if (numberOfRequestsForUser.has(userId)) {
+      if (numberOfRequestsForUser.get(userId) > numberOfRequestsPerSecond - 1) {
+        res.status(404).send("no entry");
+      }
+      else {
+        numberOfRequestsForUser.set(userId, numberOfRequestsForUser.get(userId) + 1); 
+        next();
+      }
+    }
+    else {
+      numberOfRequestsForUser.set(userId, 1);
+      next();
+    }
+  }
+}
+
+app.use(rateLimiter(5));
 
 app.get('/user', function(req, res) {
   res.status(200).json({ name: 'john' });
